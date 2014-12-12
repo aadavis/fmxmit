@@ -1,0 +1,73 @@
+--Allen Davis
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+
+
+entity fm_xmit is
+    Port ( CLKIN_IN : in  STD_LOGIC;
+           antenna : out  STD_LOGIC);
+end fm_xmit;
+
+architecture Behavioral of fm_xmit is
+--   component clocking
+--   port ( CLK32  : in  std_logic;
+--          CLK320 : out std_logic
+--   );
+--   end component;
+
+	COMPONENT clocking
+	PORT(
+		CLKIN_IN : IN std_logic;          
+		CLKFX_OUT : OUT std_logic
+		);
+	END COMPONENT;
+   
+
+   signal CLKFX_OUT            : std_logic;
+   signal shift_ctr         : unsigned (4 downto 0) := (others => '0');
+   signal phase_accumulator : unsigned (31 downto 0) := (others => '0');
+   signal beep_counter      : unsigned (19 downto 0):= (others => '0'); -- gives a 305Hz beep signal
+   signal message           : std_logic_vector(93 downto 0) := "1010101000100101110101000101110101000111011101110001010101000111010111010001110101110100000000";
+
+begin
+   antenna <= std_logic(phase_accumulator(31));
+
+--fast_clock : clocking port map (
+--      CLK32 => CLK32,
+--      CLK320 => CLK320
+--   );
+   
+	digiclockmanager : clocking PORT MAP(
+		CLKIN_IN => CLKIN_IN,
+		CLKFX_OUT => CLKFX_OUT
+	);	
+	
+   process(CLKFX_OUT)
+   begin
+      if rising_edge(CLKFX_OUT) then
+         if beep_counter = x"FFFFF" then
+            if shift_ctr = "00000" then
+               message <= message(0) & message(93 downto 1);
+
+            end if;
+            shift_ctr <= shift_ctr + 1;
+         end if;      
+         
+         -- The constants are calculated as (desired freq)/320Mhz*2^32
+         if message(0) = '1' then
+            if beep_counter(19) = '1' then
+               phase_accumulator <= phase_accumulator + 1222387958; -- gives a 91075kHz signal               
+            else
+               phase_accumulator <= phase_accumulator + 1220374692; -- gives 90925kHz signal
+            end if;
+         else 
+            phase_accumulator <= phase_accumulator + 1221381325; -- gives 91000kHz signal
+         end if;
+         
+         beep_counter <= beep_counter+1;
+      end if;
+   end process;
+end Behavioral;
